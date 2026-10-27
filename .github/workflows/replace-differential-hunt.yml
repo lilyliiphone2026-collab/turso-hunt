@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       max-parallel: 12
       matrix:
-        seed_base: [1000, 3000, 5000, 7000, 9000, 11000, 13000, 15000, 17000, 19000, 21000, 23000]
+        seed_base: [1000, 2500, 4000, 5500, 7000, 8500, 10000, 11500, 13000, 14500, 16000, 17500, 19000, 20500, 22000, 23500, 25000, 26500, 28000, 29500, 31000, 32500, 34000, 35500]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -52,4 +52,35 @@ jobs:
             sim.log
             findings.txt
             .bugbase
+          retention-days: 7
+
+  repro-7972:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.88
+        uses: dtolnay/rust-toolchain@1.88
+
+      - name: Build simulator
+        run: cargo build --bin limbo_sim --release
+
+      - name: Reproduce #7972 differential mismatch
+        run: |
+          set +e
+          ./target/release/limbo_sim \
+            --seed 3591003411748752560 --disable-bugbase --io-backend=memory \
+            --differential --minimum-tests 100 --maximum-tests 1000 2>&1 | tee repro.log
+          if grep -q "do not match" repro.log; then
+            echo "REPRODUCED on current HEAD — mismatch still alive"
+          else
+            echo "not reproduced on current HEAD"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: repro-7972-${{ github.run_id }}
+          path: repro.log
           retention-days: 7
