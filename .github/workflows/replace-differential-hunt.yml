@@ -13,9 +13,10 @@ jobs:
   hunt:
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 20
       matrix:
-        seed_base: [1000, 2500, 4000, 5500, 7000, 8500, 10000, 11500, 13000, 14500, 16000, 17500, 19000, 20500, 22000, 23500, 25000, 26500, 28000, 29500, 31000, 32500, 34000, 35500]
+        profile: [write_heavy, write_heavy_spill, faultless, simple_mvcc, savepoint_stress]
+        seed_base: [1000, 5000, 9000, 13000, 17000, 21000, 25000, 29000]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -30,10 +31,11 @@ jobs:
       - name: Differential hunt (turso vs sqlite)
         run: |
           SEED=$(( ${{ matrix.seed_base }} + RANDOM % 2000 ))
-          echo "hunt seed=$SEED"
+          echo "hunt profile=${{ matrix.profile }} seed=$SEED"
           MINUTES=${{ github.event.inputs.minutes || '355' }}
           set +e
           timeout $(( MINUTES * 60 )) ./target/release/limbo_sim \
+            --profile ${{ matrix.profile }} \
             --differential -s "$SEED" -n 20000 -k 2000 2>&1 | tee sim.log
           echo "exit=$?" >> "$GITHUB_ENV"
           # Real findings: one engine failed while the other did NOT, or
@@ -47,7 +49,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hunt-${{ matrix.seed_base }}-${{ github.run_id }}
+          name: hunt-${{ matrix.profile }}-${{ matrix.seed_base }}-${{ github.run_id }}
           path: |
             sim.log
             findings.txt
